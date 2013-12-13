@@ -14,7 +14,7 @@ class Type(messages.Enum):
   CLIMB = 4
 
 class Container(ndb.Model):
-    active = ndb.BooleanProperty()
+    active = ndb.BooleanProperty(default=False)
     contType = msgprop.EnumProperty(Type, required=True)
     menuParent = ndb.KeyProperty()
     menuChildren = ndb.KeyProperty(repeated=True)
@@ -25,7 +25,7 @@ class Attrib(ndb.Model):
     authur = ndb.UserProperty()
     created = ndb.DateTimeProperty(auto_now_add=True)
     modified = ndb.DateTimeProperty(auto_now=True)
-    active = ndb.BooleanProperty()
+    active = ndb.BooleanProperty(default=False)
 
 
 class AttribName(Attrib):
@@ -192,9 +192,18 @@ class Element:
         return attribute
 
     @ndb.transactional
-    def setAttribActive(self, attribute):
-        pass
+    def setAttribActive(self, key):
+        attribute = key.get()
+        attributeClass = type(attribute)
+        existingAttribs = attributeClass.query(ancestor=self.key).fetch(1000)
+        for a in existingAttribs:
+            if key == a.key:
+                a.active = True
+            else:
+                a.active = False
+        ndb.put_multi(existingAttribs)
 
+    @ndb.transactional
     def getAtribTypes(self):
         # self.attribs = [attribType1, attribType2 ...]
         attribs = list(set([key.kind() for key in self.container.attributes]))
@@ -206,6 +215,7 @@ class Element:
                     attribs.append(attrib)
         self.attribs = attribs
 
+    @ndb.transactional
     def getAttribDeep(self, attribute):
         # self.attribs = [attribType1, [attribType2_instance1, attribType2_instance2 ...] ...]
         if self.attribs is None:
@@ -230,6 +240,7 @@ class Element:
         self.attribs = outList
         return attributes
 
+    @ndb.transactional
     def getAttribShallow(self, attribute):
         """ Populate self.attribs with only the active attribute and pad the remainder of the array with None."""
         # self.attribs = [attribType1, [attribType2_instance1, None, None ...] ...]
@@ -261,6 +272,7 @@ class Element:
         self.attribs = outList
         return attributes[0]
 
+    @ndb.transactional
     def getAttribShallowAll(self):
         if self.attribs is None:
             self.getAtribTypes()
@@ -280,7 +292,7 @@ class Element:
         return self.container.menuChildren
 
     def getMenuParent(self):
-        return self.container.menuParent.key
+        return self.container.menuParent
 
 
 def copyAttrib(attribute, parent):

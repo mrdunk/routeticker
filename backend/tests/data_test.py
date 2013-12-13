@@ -73,6 +73,7 @@ class ElementTestCase(unittest.TestCase):
     root_node = data.Element(contType=data.Type.ROOT)
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
 
+    # Using root_node as parent.
     child_node = data.Element(menuParent=root_node, contType=data.Type.AREA)
     # re-read the root_node to update child keys.
     root_node = data.Element(key=root_node.key)
@@ -83,6 +84,29 @@ class ElementTestCase(unittest.TestCase):
 
     self.assertNotEqual(child_node.key, data.root_key)
     
+    self.assertIn(child_node.key, root_node.container.menuChildren)
+    self.assertEqual(1, len(root_node.container.menuChildren))
+
+    self.assertEqual(child_node.container.menuParent, root_node.key)
+
+    self.assertEqual(data.Type.AREA, child_node.container.contType)
+
+  def testInitCreateContainerFromParentKeySucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data.Element(contType=data.Type.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+
+    # Using root_node.key as parent.
+    child_node = data.Element(menuParent=root_node.key, contType=data.Type.AREA)
+    # re-read the root_node to update child keys.
+    root_node = data.Element(key=root_node.key)
+
+    self.assertEqual(1, data.Container.query(ancestor=root_node.key).count(10))
+    self.assertEqual(1, data.Container.query(ancestor=child_node.key).count(10))
+    self.assertEqual(2, data.Container.query().count(10))
+
+    self.assertNotEqual(child_node.key, data.root_key)
+
     self.assertIn(child_node.key, root_node.container.menuChildren)
     self.assertEqual(1, len(root_node.container.menuChildren))
 
@@ -546,9 +570,44 @@ class ElementTestCase(unittest.TestCase):
     # re-read the root_node to update child keys.
     root_node = data.Element(key=root_node.key)
 
-    parent = child_node.getMenuParent
+    parent = child_node.getMenuParent()
     self.assertEqual(parent, root_node.key)
 
+  def testSetAttribActive(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data.Element(contType=data.Type.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_node = data.Element(menuParent=root_node, contType=data.Type.AREA)
+    # re-read the root_node to update child keys.
+    root_node = data.Element(key=root_node.key)
+
+    attribute_0 = child_node.addAttrib(data.AttribDescription(text="test description", active=True))
+    attribute_1 = child_node.addAttrib(data.AttribName(text="test name"))
+
+    self.testbed.setup_env(USER_EMAIL='otheruser@gmail.com', USER_ID='2', USER_IS_ADMIN='0', overwrite = True)
+    attribute_2 = child_node.addAttrib(data.AttribDescription(text="test description 2"))
+    attribute_3 = child_node.addAttrib(data.AttribName(text="test name 2", active=True))
+
+    self.testbed.setup_env(USER_EMAIL='billythefish@gmail.com', USER_ID='3', USER_IS_ADMIN='0', overwrite = True)
+    attribute_4 = child_node.addAttrib(data.AttribDescription(text="test description 3"))
+    attribute_5 = child_node.addAttrib(data.AttribName(text="test name 3"))
+
+    child_node.setAttribActive(attribute_4.key)
+    child_node.setAttribActive(attribute_5.key)
+
+    attribute_0 = attribute_0.key.get()
+    attribute_1 = attribute_1.key.get()
+    attribute_2 = attribute_2.key.get()
+    attribute_3 = attribute_3.key.get()
+    attribute_4 = attribute_4.key.get()
+    attribute_5 = attribute_5.key.get()
+
+    self.assertEqual(False, attribute_0.active)
+    self.assertEqual(False, attribute_1.active)
+    self.assertEqual(False, attribute_2.active)
+    self.assertEqual(False, attribute_3.active)
+    self.assertEqual(True, attribute_4.active)
+    self.assertEqual(True, attribute_5.active)
 
 
 
