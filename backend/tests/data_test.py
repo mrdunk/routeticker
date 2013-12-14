@@ -201,14 +201,22 @@ class ElementTestCase(unittest.TestCase):
     self.assertNotEqual(root_node, test_node2)
 
   def testInitLookupManySucess(self):
+    NUMBER = 10
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
     root_node = data.Element(contType=data.Type.ROOT)
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
-    child_nodes_keys = [data.Element(menuParent=root_node, contType=data.Type.AREA).key for unused in range(10)]
+    child_nodes_keys = [data.Element(menuParent=root_node, contType=data.Type.AREA).key for unused in range(NUMBER)]
 
     test_lookup = data.Element(key=child_nodes_keys)
-    self.assertEqual(len(test_lookup.keys), 10)
-    self.assertEqual(len(test_lookup.containers), 10)
+    self.assertEqual(len(test_lookup.keys), NUMBER)
+    self.assertEqual(len(test_lookup.containers), NUMBER)
+
+    # Cross group transactions can only span 5 or less groups so try a lower number that uses transactions too.
+    NUMBER = 3
+    child_nodes_keys = child_nodes_keys[:NUMBER]
+    test_lookup = data.Element(key=child_nodes_keys)
+    self.assertEqual(len(test_lookup.keys), NUMBER)
+    self.assertEqual(len(test_lookup.containers), NUMBER)
 
   def testInitLookupManyFail(self):
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)

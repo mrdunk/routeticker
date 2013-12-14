@@ -64,7 +64,20 @@ class Element:
             contType = [contType]
 
         if type(key) is ndb.Key:
-            # Single lookup
+            self.lookupSingle(key, active, contType)
+        elif type(key) is ListType:
+            # Cross group transactions can only span 5 or less groups.
+            if len(key) <= 5:
+                ndb.transaction(lambda: self.lookupMultiple(key, active, contType), xg=True)
+            else:
+                # LOOKUP NOT IN TRANSACTION.
+                self.lookupMultiple(key, active, contType)
+        else:
+            logging.error('Not a key: %s' % key)
+            raise TypeError
+
+    @ndb.transactional
+    def lookupSingle(self, key=None, active=None, contType=None):
             self.container = key.get()
             if self.container is None:
                 return
@@ -77,8 +90,8 @@ class Element:
                 return
             self.key = key
             return
-        elif type(key) is ListType:
-            # Multiple lookup
+
+    def lookupMultiple(self, key=None, active=None, contType=None):
             key = list(set(key))
             key = [k for k in key if type(k) is ndb.Key]
             self.keys = []
@@ -91,9 +104,6 @@ class Element:
                 self.keys.append(entity.key)
                 self.containers.append(entity)
             return
-        else:
-            logging.error('Not a key: %s' % key)
-            raise TypeError
 
     @ndb.transactional(xg=True)
     def create(self, active=None, contType=None, menuParent=None):
