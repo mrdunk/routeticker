@@ -63,6 +63,9 @@ class Element:
         if contType is not None and type(contType) is not ListType:
             contType = [contType]
 
+        if type(key) is StringType:
+            key = ndb.Key(Container, key)
+
         if type(key) is ndb.Key:
             self.lookupSingle(key, active, contType)
         elif type(key) is ListType:
@@ -299,10 +302,10 @@ class Element:
         self.attribs = outList
 
     def getMenuChildren(self):
-        return self.container.menuChildren
+        return [child.id() for child in self.container.menuChildren]
 
     def getMenuParent(self):
-        return self.container.menuParent
+        return self.container.menuParent.id()
 
 
 def copyAttrib(attribute, parent):

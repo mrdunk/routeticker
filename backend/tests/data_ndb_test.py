@@ -185,6 +185,15 @@ class ElementTestCase(unittest.TestCase):
     self.assertEqual(root_node.key, test_node.key)
     self.assertEqual(root_node.container, test_node.container)
 
+  def testInitLookupOneByKeyString(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_ndb.Element(contType=data_ndb.Type.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_ndb.Element(key=root_node.key.id())
+
+    self.assertEqual(root_node.key, test_node.key)
+    self.assertEqual(root_node.container, test_node.container)    
+
   def testInitLookupOneFail(self):
     badKey1 = ndb.Key('Container', 'earwax')
     badKey2 = ndb.Key('AttribName', 'root')
@@ -565,9 +574,9 @@ class ElementTestCase(unittest.TestCase):
     root_node = data_ndb.Element(key=root_node.key)
 
     children = root_node.getMenuChildren()
-    self.assertIn(child_node_1.key, children)
-    self.assertIn(child_node_2.key, children)
-    self.assertIn(child_node_3.key, children)
+    self.assertIn(child_node_1.key.id(), children)
+    self.assertIn(child_node_2.key.id(), children)
+    self.assertIn(child_node_3.key.id(), children)
     self.assertEqual(3, len(children))
 
   def testGetMenuParent(self):
@@ -579,7 +588,7 @@ class ElementTestCase(unittest.TestCase):
     root_node = data_ndb.Element(key=root_node.key)
 
     parent = child_node.getMenuParent()
-    self.assertEqual(parent, root_node.key)
+    self.assertEqual(parent, root_node.key.id())
 
   def testSetAttribActive(self):
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
@@ -616,7 +625,6 @@ class ElementTestCase(unittest.TestCase):
     self.assertEqual(False, attribute_3.active)
     self.assertEqual(True, attribute_4.active)
     self.assertEqual(True, attribute_5.active)
-
 
 
 if __name__ == '__main__':
