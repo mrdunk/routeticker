@@ -36,7 +36,7 @@ class BooleanProperty(object):
 class EnumProperty(object):
     def __init__(self, classType, default=None):
         self.classType = classType
-        if default is None or type(default) is classType:
+        if default is None or default in [getattr(self.classType, k) for k in dir(self.classType) if k[0] != '_']:
             self.value = default
             return
         raise TypeError
@@ -52,9 +52,8 @@ class EnumProperty(object):
 
 class StringProperty(object):
     def __init__(self, default=None, repeated=False):
-        self.repeated = False
-        if repeated:
-            self.repeated = True
+        self.repeated = repeated
+        if repeated == True:
             self.value = []
             if type(default) is StringType:
                 self.value.append(default)
@@ -67,20 +66,22 @@ class StringProperty(object):
         raise TypeError
 
     def __get__(self, instance, owner):
+        logging.error(instance)
+        logging.error(owner)
         return self.value
 
     def __set__(self, instance, value):
         if value is None:
             self.value = value
             return
-        if self.repeated and type(value) is ListType:
+        if self.repeated and type(value) is ListType and len([val for val in value if type(val) is not StringType]) == 0:
             self.value = value
             return
         if self.repeated and type(value) is StringType:
             self.value = [value]
             return
         if not self.repeated and type(value) is StringType:
-            self.value = [value]
+            self.value = value
             return
         raise TypeError
 
@@ -88,7 +89,11 @@ class StringProperty(object):
         return self.value[key]
 
     def __setitem__(self, key, value):
-        self.value[key] = value
+        logging.error("__setitem__")
+        if type(value) is StringType:
+            self.value[key] = value
+            return
+        raise TypeError
 
 
 class DataStore(object):
