@@ -62,8 +62,8 @@ class PropertysTestCase(unittest.TestCase):
 
   def testStringProperty(self):
     class Test(object):
-#        test = data_dict.StringProperty()
-#        test2 = data_dict.StringProperty(default="haggis, neeps and tatties")
+        test = data_dict.StringProperty()
+        test2 = data_dict.StringProperty(default="haggis, neeps and tatties")
         test3 = data_dict.StringProperty(repeated=True)
 
     testInstance = Test()
@@ -101,9 +101,9 @@ class PropertysTestCase(unittest.TestCase):
         testInstance.test3 = [1]
 
     # WTF? http://stackoverflow.com/questions/20648366/strange-interaction-between-setitem-and-get
-    #testInstance.test3 = ["one great thing", "deserves another", "and another"]
-    #with self.assertRaises(TypeError):
-    #    (testInstance.test3[0]) = 1
+    testInstance.test3 = ["one great thing", "deserves another", "and another"]
+    with self.assertRaises(TypeError):
+        (testInstance.test3[0]) = 1
 
 
 class DataListTestCase(unittest.TestCase):

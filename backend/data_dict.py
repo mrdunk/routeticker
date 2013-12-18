@@ -52,35 +52,87 @@ class EnumProperty(object):
 
 class StringProperty(object):
     def __init__(self, default=None, repeated=False):
-        self.repeated = repeated
-        if repeated == True:
-            self.value = []
-            if type(default) is StringType:
-                self.value.append(default)
-            elif type(default) is ListType:
-                self.value = default
+        logging.debug("StringProperty.__init__(default=%s, repeated=%s)" % (default, repeated))
+        self.obj = None
+        if repeated:
+            logging.debug("r")
+            self.obj = StringPropertyRepeated(default=default)
+        else:
+            logging.debug("s")
+            self.obj = StringPropertySingle(default=default)
+        logging.debug(self.obj)
+
+    def __get__(self, instance, owner):
+        logging.debug("StringProperty.__get__")
+        if self.obj is not None:
+            logging.debug(self.obj)
+            if self.obj.__class__ is StringPropertySingle:
+                return self.obj.__get__(instance, owner)
+            return self.obj
+        return
+
+    def __set__(self, instance, value):
+        self.obj.__set__(instance, value)
+
+    def __getitem__(self, key):
+        return self.obj.__getitem__(key)
+
+    def __setitem__(self, key, value):
+        self.obj.__setitem__(key, value)
+
+class StringPropertyRepeated(list):
+    def __init__(self, default=None):
+        if type(default) is StringType:
+            list.__init__(self, [default])
             return
-        elif default is None or type(default) is StringType:
+        elif type(default) is ListType and ListType and len([val for val in default if type(val) is not StringType]) == 0:
+            list.__init__(self, default)
+            return
+        elif default is None:
+            list.__init__(self, [])
+            return
+        raise TypeError
+
+    #def __get__(self, instance, owner):
+    #    return self
+
+    def __set__(self, instance, value):
+        if value is None:
+            list.__init__(self, [])
+            return
+        if type(value) is ListType and len([val for val in value if type(val) is not StringType]) == 0:
+            list.__init__(self, value)
+            return
+        if type(value) is StringType:
+            list.__init__(self, [value])
+            return
+        raise TypeError
+
+    def __getitem__(self, key):
+        return list.__getitem__(self, key)
+
+    def __setitem__(self, key, value):
+        if type(value) is StringType:
+            list.__setitem__(self, key, value)
+            return
+        raise TypeError
+
+class StringPropertySingle(object):
+    def __init__(self, default=None):
+        self.value = None
+        if default is None or type(default) is StringType:
             self.value = default
             return
         raise TypeError
 
     def __get__(self, instance, owner):
-        logging.error(instance)
-        logging.error(owner)
         return self.value
 
     def __set__(self, instance, value):
         if value is None:
             self.value = value
             return
-        if self.repeated and type(value) is ListType and len([val for val in value if type(val) is not StringType]) == 0:
-            self.value = value
-            return
-        if self.repeated and type(value) is StringType:
-            self.value = [value]
-            return
-        if not self.repeated and type(value) is StringType:
+        if type(value) is StringType:
             self.value = value
             return
         raise TypeError
@@ -89,7 +141,6 @@ class StringProperty(object):
         return self.value[key]
 
     def __setitem__(self, key, value):
-        logging.error("__setitem__")
         if type(value) is StringType:
             self.value[key] = value
             return
