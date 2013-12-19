@@ -52,22 +52,19 @@ class EnumProperty(object):
 
 class StringProperty(object):
     def __init__(self, default=None, repeated=False):
-        logging.debug("StringProperty.__init__(default=%s, repeated=%s)" % (default, repeated))
         self.obj = None
         if repeated:
-            logging.debug("r")
             self.obj = StringPropertyRepeated(default=default)
         else:
-            logging.debug("s")
             self.obj = StringPropertySingle(default=default)
-        logging.debug(self.obj)
 
     def __get__(self, instance, owner):
-        logging.debug("StringProperty.__get__")
         if self.obj is not None:
-            logging.debug(self.obj)
             if self.obj.__class__ is StringPropertySingle:
+                # Single value
                 return self.obj.__get__(instance, owner)
+            # List of values
+            # http://stackoverflow.com/questions/20648366/strange-interaction-between-setitem-and-get
             return self.obj
         return
 
@@ -92,9 +89,6 @@ class StringPropertyRepeated(list):
             list.__init__(self, [])
             return
         raise TypeError
-
-    #def __get__(self, instance, owner):
-    #    return self
 
     def __set__(self, instance, value):
         if value is None:
@@ -148,14 +142,22 @@ class StringPropertySingle(object):
 
 
 class DataStore(object):
-    def __init__(self, key=None, **kwargs):
-        self.key = key
+    def __init__(self, **kwargs):
+        def applyFields(clss):
+            if clss.__base__ is not DataStore and clss.__base__ is not object:
+                clss.__base__().fields()
+                applyFields(clss.__base__)
+        applyFields(self.__class__)
+
+        self.key = None     # May get overwritten by kwargs.
         for k in kwargs:
             setattr(self, k, kwargs[k])
 
     def get(self, key=None):
         if key is None:
             key = self.key
+        if key is None:
+            raise KeyError
         return gContainer.get(key)
 
     def put(self, value=None):
@@ -165,17 +167,22 @@ class DataStore(object):
             self.key = DataStore.make_key(gKeyCounter)
         if value is None:
             value = self
+        #logging.debug("put %s" % value.active)
         gContainer[self.key] = value
         return self.key
 
-    def __setitem__(self, value, key=None):
-        if key is None:
-            key = self.key
-        gContainer[key] = value
+    # Don't know if we'll use this
+    def __setitem__(self, key, value):
+        if key is not None:
+            self.key = key
+        self.put(value)
 
+    # Don't know if we'll use this
     def __getitem__(self, key=None):
         if key is None:
             key = self.key
+        if key is None:
+            raise KeyError
         return gContainer[key]
 
     @staticmethod
@@ -184,23 +191,27 @@ class DataStore(object):
 
 
 class Container(DataStore):
-    active = BooleanProperty()
-    contType = EnumProperty(ContentType)
-    menuParent = StringProperty()
-    menuChildren = StringProperty(repeated=True)
-    attributes = StringProperty(repeated=True)
+    def fields(self):
+        self.active = BooleanProperty()
+        self.contType = EnumProperty(ContentType)
+        self.menuParent = StringProperty()
+        self.menuChildren = StringProperty(repeated=True)
+        self.attributes = StringProperty(repeated=True)
 
 class Attrib(DataStore):
-    authur = None
-    created = None
-    modified = None
-    active = BooleanProperty()
+    def fields(self):
+        self.authur = None
+        self.created = None
+        self.modified = None
+        self.active = BooleanProperty()
 
 class AttribName(Attrib):
-    text = StringProperty()
+    def fields(self):
+        self.text = StringProperty()
 
 class AttribDescription(Attrib):
-    text = StringProperty()
+    def fields(self):
+        self.text = StringProperty()
 
 
 class Element:
@@ -222,7 +233,7 @@ class Element:
         if type(key) is ndb.Key:
             key = 'ndb_%s_%s' % (key.kind(), key.id())
 
-        if type(key) is ndb.Key:
+        if type(key) is StringType:
             self.lookupSingle(key, active, contType)
         elif type(key) is ListType:
             self.lookupMultiple(key, active, contType)
@@ -231,9 +242,7 @@ class Element:
             raise TypeError
 
     def lookupSingle(self, key=None, active=None, contType=None):
-        if type(key) is StringType:
-            key = DataStore(key)
-        self.container = key.get()
+        self.container = DataStore(key=key).get()
         if self.container is None:
             return
 
@@ -282,26 +291,41 @@ class Element:
                     logging.info('user:  %s' % user)
                     logging.info('admin: %s' % users.is_current_user_admin())
                     tmpKey = root_key
-                    tmpContainer = tmpKey.get()
+                    tmpContainer = DataStore(key=tmpKey).get()
             else:
-                if type(menuParent) is ndb.Key:
-                    menuParent = menuParent.get()
-                elif menuParent.__class__ is Element and type(menuParent.key) is ndb.Key:
-                    # Re-fetch menuParent from db to ensure fresh data.
-                    menuParent = menuParent.key.get()
+#                if type(menuParent) is ndb.Key:
+#                    logging.warning("Dangerous key type.")
+#                    menuParent = menuParent.get()
+#                elif menuParent.__class__ is Element and type(menuParent.key) is not None:
+#                    # Re-fetch menuParent from db to ensure fresh data.
+#                    menuParent = menuParent.container.get()
+
+                if type(menuParent) is StringType:
+                    #menuParent = DataStore(key=menuParent).get()
+                    menuParent = Element(key=menuParent)
                 else:
+                    #menuParent = DataStore(key=menuParent.key).get()
+                    menuParent = Element(key=menuParent.key)
+
+                if menuParent.container.__class__ is not Container:
                     logging.error('Not a key: %s' % menuParent)
                     raise TypeError
+
                 if active is None:
                     active = False
+
                 #self.container = Container(parent=root_key, active=active, contType=contType, menuParent=menuParent.key)
                 tmpContainer = Container(active=active, contType=contType, menuParent=menuParent.key, menuChildren=[])
                 tmpKey = tmpContainer.put()
 
-                if tmpKey not in menuParent.menuChildren:
-                    menuParent.menuChildren.append(tmpKey)
-                    menuParent.put()
+                logging.debug(menuParent.container.active)
+                logging.debug(gContainer[menuParent.key].active)
 
+                if tmpKey not in menuParent.container.menuChildren:
+                    menuParent.container.menuChildren.append(tmpKey)
+                    menuParent.container.active = True
+                    menuParent.container.put()
+                    logging.debug(gContainer[menuParent.key].active)
             # Do these last so they are not done yet if transaction is rolled back.
             self.key = tmpKey
             self.container = tmpContainer
