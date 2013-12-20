@@ -1,6 +1,7 @@
 import unittest
 from google.appengine.ext import testbed
 from protorpc import messages
+from google.appengine.api import users
 
 import data_dict
 
@@ -377,6 +378,194 @@ class DataListTestCase(unittest.TestCase):
         lastChild = child_node
 
     self.assertEqual(0, len(lastChild.container.menuChildren))  # The last node has no children
+
+  def testInitCreateContainerNotUser(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    self.assertIsNone(users.get_current_user())
+    self.assertEqual(data_dict.gKeyCounter, 1)
+    self.assertEqual(len(data_dict.gContainer), 2)
+
+    child_node = data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA)
+
+    self.assertEqual(data_dict.gKeyCounter, 1)
+    self.assertEqual(len(data_dict.gContainer), 2)
+
+    self.assertIsNone(child_node.key)
+
+  def testInitLookupOneSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_dict.Element(key=root_node.key)
+
+    self.assertEqual(root_node.key, test_node.key)
+    self.assertEqual(root_node.container, test_node.container)
+
+  def testInitLookupOneFail(self):
+    badKey1 = 'earwax'
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+
+    test_node = data_dict.Element(key=badKey1)
+    self.assertIs(test_node.key, None)
+
+  def testInitLookupManySucess(self):
+    NUMBER = 10
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(NUMBER)]
+
+    self.assertEqual(len(child_nodes_keys), NUMBER)
+
+    test_lookup = data_dict.Element(key=child_nodes_keys)
+    self.assertEqual(len(test_lookup.keys), NUMBER)
+    self.assertEqual(len(test_lookup.containers), NUMBER)
+
+    NUMBER = 3
+    child_nodes_keys = child_nodes_keys[:NUMBER]
+    test_lookup = data_dict.Element(key=child_nodes_keys)
+    self.assertEqual(len(test_lookup.keys), NUMBER)
+    self.assertEqual(len(test_lookup.containers), NUMBER)
+
+  def testInitLookupManyFail(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+
+    child_nodes_keys[0] = None
+
+    test_lookup = data_dict.Element(key=child_nodes_keys)
+    self.assertEqual(len(test_lookup.keys), 9)
+    self.assertEqual(len(test_lookup.containers), 9)
+
+    child_nodes_keys[0] = child_nodes_keys[1]
+    test_lookup = data_dict.Element(key=child_nodes_keys)
+    self.assertEqual(len(test_lookup.keys), 9)
+    self.assertEqual(len(test_lookup.containers), 9)
+
+  def testInitLookupLimitedSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_dict.Element(key=root_node.key, active=True, contType=data_dict.ContentType.ROOT)
+
+    self.assertEqual(root_node.key, test_node.key)
+    self.assertEqual(root_node.container, test_node.container)
+
+  def testInitLookupLimitedListSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_dict.Element(key=root_node.key, active=True, contType=[data_dict.ContentType.ROOT, data_dict.ContentType.AREA])
+
+    self.assertEqual(root_node.key, test_node.key)
+    self.assertEqual(root_node.container, test_node.container)
+
+  def testInitLookupLimitedFail(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_dict.Element(key=root_node.key, contType=data_dict.ContentType.AREA)
+
+    self.assertNotEqual(root_node.key, test_node.key)
+    self.assertNotEqual(root_node.container, test_node.container)
+
+    test_node = data_dict.Element(key=root_node.key, active=False)
+
+    self.assertNotEqual(root_node.key, test_node.key)
+    self.assertNotEqual(root_node.container, test_node.container)
+
+  def testInitLookupLimitedListFail(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
+    test_node = data_dict.Element(key=root_node.key, contType=[data_dict.ContentType.AREA, data_dict.ContentType.CRAG])
+
+    self.assertNotEqual(root_node.key, test_node.key)
+    self.assertNotEqual(root_node.container, test_node.container)
+
+  def testInitLookupManyLimitedSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, active=False, contType=data_dict.ContentType.AREA)
+    self.assertEqual(len(test_lookup.keys), 10)
+    self.assertEqual(len(test_lookup.containers), 10)
+
+  def testInitLookupManyLimitedListSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, active=False, contType=[data_dict.ContentType.AREA, data_dict.ContentType.CRAG])
+    self.assertEqual(len(test_lookup.keys), 10)
+    self.assertEqual(len(test_lookup.containers), 10)
+
+  def testInitLookupManyLimitedFail(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, contType=data_dict.ContentType.CRAG)
+    self.assertEqual(len(test_lookup.keys), 0)
+    self.assertEqual(len(test_lookup.containers), 0)
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, active=True)
+    self.assertEqual(len(test_lookup.keys), 0)
+    self.assertEqual(len(test_lookup.containers), 0)
+
+  def testInitLookupManyLimitedListFail(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, contType=[data_dict.ContentType.ROOT, data_dict.ContentType.CRAG])
+    self.assertEqual(len(test_lookup.keys), 0)
+    self.assertEqual(len(test_lookup.containers), 0)
+
+  def testInitLookupManyLimitedListPartialSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_nodes_keys = [data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA).key for unused in range(10)]
+    child_nodes_keys.append(data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.CRAG).key)
+    child_nodes_keys.append(data_dict.Element(menuParent=root_node, active=True, contType=data_dict.ContentType.AREA).key)
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, contType=data_dict.ContentType.CRAG)
+    self.assertEqual(len(test_lookup.keys), 1)
+    self.assertEqual(len(test_lookup.containers), 1)
+
+    test_lookup = data_dict.Element(key=child_nodes_keys, active=True)
+    self.assertEqual(len(test_lookup.keys), 1)
+    self.assertEqual(len(test_lookup.containers), 1)
+
+  def testAddAttribSucess(self):
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
+    root_node = data_dict.Element(contType=data_dict.ContentType.ROOT)
+    self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='0', overwrite = True)
+    child_node = data_dict.Element(menuParent=root_node, contType=data_dict.ContentType.AREA)
+
+    child_node.addAttrib(data_dict.AttribName(text="test name"))
+    child_node.addAttrib(data_dict.AttribDescription(text="test description"))
+
+    self.assertEqual(1, data_dict.AttribName.query(ancestor=root_node.key).count(10))
+    self.assertEqual(1, data_dict.AttribName.query(ancestor=child_node.key).count(10))
+
+    self.assertEqual(2, len(child_node.container.attributes))
+
+    atribs_name = data_dict.AttribName.query(ancestor=child_node.key).fetch(10)
+    self.assertEqual(1, len(atribs_name))
+    self.assertIn(atribs_name[0].key, child_node.container.attributes)
 
 
 

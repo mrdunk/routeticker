@@ -196,7 +196,7 @@ class ElementTestCase(unittest.TestCase):
 
   def testInitLookupOneFail(self):
     badKey1 = ndb.Key('Container', 'earwax')
-    badKey2 = ndb.Key('AttribName', 'root')
+    badKey2 = ndb.Key('AttribName', data_ndb.root_key.id())
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)
     root_node = data_ndb.Element(contType=data_ndb.Type.ROOT)
     self.testbed.setup_env(USER_EMAIL=None, USER_ID='0', USER_IS_ADMIN='0', overwrite = True)
@@ -304,7 +304,6 @@ class ElementTestCase(unittest.TestCase):
     test_lookup = data_ndb.Element(key=child_nodes_keys, active=False, contType=[data_ndb.Type.AREA, data_ndb.Type.CRAG])
     self.assertEqual(len(test_lookup.keys), 10)
     self.assertEqual(len(test_lookup.containers), 10)
-
 
   def testInitLookupManyLimitedFail(self):
     self.testbed.setup_env(USER_EMAIL='usermail@gmail.com', USER_ID='1', USER_IS_ADMIN='1', overwrite = True)

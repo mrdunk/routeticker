@@ -143,6 +143,7 @@ class StringPropertySingle(object):
 
 class DataStore(object):
     def __init__(self, **kwargs):
+        # Recursive function to call all .fields() methods in inhereted classes.
         def applyFields(clss):
             if clss.__base__ is not DataStore and clss.__base__ is not object:
                 clss.__base__().fields()
@@ -255,12 +256,15 @@ class Element:
         self.key = key
         return
 
-    def lookupMultiple(self, key=None, active=None, contType=None):
-            key = list(set(key))
-            key = [k for k in key if type(k) is ndb.Key]
+    def lookupMultiple(self, keys=None, active=None, contType=None):
+            keys = list(set(keys))
+            keys = [k for k in keys if type(k) is StringType]
             self.keys = []
             self.containers = []
-            for entity in ndb.get_multi(key):
+            for key in keys:
+                entity = DataStore(key=key).get()
+                if entity is None:
+                    continue
                 if active is not None and not entity.active == active:
                     continue
                 if contType is not None and entity.contType not in contType:
@@ -318,14 +322,10 @@ class Element:
                 tmpContainer = Container(active=active, contType=contType, menuParent=menuParent.key, menuChildren=[])
                 tmpKey = tmpContainer.put()
 
-                logging.debug(menuParent.container.active)
-                logging.debug(gContainer[menuParent.key].active)
-
                 if tmpKey not in menuParent.container.menuChildren:
                     menuParent.container.menuChildren.append(tmpKey)
                     menuParent.container.active = True
                     menuParent.container.put()
-                    logging.debug(gContainer[menuParent.key].active)
             # Do these last so they are not done yet if transaction is rolled back.
             self.key = tmpKey
             self.container = tmpContainer
