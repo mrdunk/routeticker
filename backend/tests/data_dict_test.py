@@ -19,41 +19,99 @@ class PropertysTestCase(unittest.TestCase):
 
   def testBooleanProperty(self):
     class Test(object):
-        test = data_dict.BooleanProperty()
-        test2 = data_dict.BooleanProperty(default=True)
+      test = data_dict.BooleanProperty()
+      test2 = data_dict.BooleanProperty(default=True)
+      test3 = data_dict.BooleanProperty(repeated=True)
 
     testInstance = Test()
-    self.assertIs(testInstance.test, None)
+    testInstance2 = Test()
+
+    self.assertEqual(testInstance.test, None)
+    self.assertEqual(testInstance.test2, True)
+    self.assertEqual(testInstance.test3, [])
+    self.assertEqual(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, True)
+    self.assertEqual(testInstance2.test3, [])
 
     testInstance.test = True
-    self.assertEqual(testInstance.test, True)
+    testInstance.test2 = False
+    testInstance.test3 = [True]
 
-    testInstance.test = False
-    self.assertEqual(testInstance.test, False)
+    self.assertEqual(testInstance.test, True)
+    self.assertEqual(testInstance.test2, False)
+    self.assertEqual(testInstance.test3, [True])
+    self.assertEqual(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, True)
+    self.assertEqual(testInstance2.test3, [])
+
+    testInstance.test3.append(False)
+
+    self.assertEqual(testInstance.test, True)
+    self.assertEqual(testInstance.test2, False)
+    self.assertEqual(testInstance.test3, [True, False])
+    self.assertEqual(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, True)
+    self.assertEqual(testInstance2.test3, [])
+
+    testInstance.test3[0] = False
+    
+    self.assertEqual(testInstance.test, True)
+    self.assertEqual(testInstance.test2, False)
+    self.assertEqual(testInstance.test3, [False, False])
+    self.assertEqual(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, True)
+    self.assertEqual(testInstance2.test3, [])
 
     with self.assertRaises(TypeError):
         testInstance.test = "fish"
 
-    self.assertEqual(testInstance.test2, True)
+    with self.assertRaises(TypeError):
+        testInstance.test3 = [True, "trout"]
+
+    with self.assertRaises(TypeError):
+        testInstance.test3[1] = "trout"
+    self.assertEqual(testInstance.test3, [False, False])
+
+    with self.assertRaises(TypeError):
+        testInstance.test3 = True
+
+    with self.assertRaises(TypeError):
+        testInstance.test = []
 
   def testEnumProperty(self):
     class Test(object):
-        test = data_dict.EnumProperty(data_dict.ContentType)
-        test2 = data_dict.EnumProperty(data_dict.ContentType, default=data_dict.ContentType().ROOT)
+      test = data_dict.EnumProperty(data_dict.ContentType)
+      test2 = data_dict.EnumProperty(data_dict.ContentType, default=data_dict.ContentType().ROOT)
 
     testInstance = Test()
+    testInstance2 = Test()
+
     self.assertIs(testInstance.test, None)
+    self.assertEqual(testInstance.test2, data_dict.ContentType.ROOT)
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, data_dict.ContentType.ROOT)
 
     testInstance.test = data_dict.ContentType.ROOT
+
     self.assertEqual(testInstance.test, data_dict.ContentType.ROOT)
+    self.assertEqual(testInstance.test2, data_dict.ContentType.ROOT)
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, data_dict.ContentType.ROOT)
 
     testInstance.test = data_dict.ContentType.CLIMB
+
     self.assertEqual(testInstance.test, data_dict.ContentType.CLIMB)
+    self.assertEqual(testInstance.test2, data_dict.ContentType.ROOT)
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, data_dict.ContentType.ROOT)
 
     with self.assertRaises(TypeError):
         testInstance.test = "fish"
 
+    self.assertEqual(testInstance.test, data_dict.ContentType.CLIMB)
     self.assertEqual(testInstance.test2, data_dict.ContentType.ROOT)
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, data_dict.ContentType.ROOT)
 
     with self.assertRaises(TypeError):
         class Bad(object):
@@ -63,34 +121,74 @@ class PropertysTestCase(unittest.TestCase):
 
   def testStringProperty(self):
     class Test(object):
-        test = data_dict.StringProperty()
-        test2 = data_dict.StringProperty(default="haggis, neeps and tatties")
-        test3 = data_dict.StringProperty(repeated=True)
+      test = data_dict.StringProperty()
+      test2 = data_dict.StringProperty(default="haggis, neeps and tatties")
+      test3 = data_dict.StringProperty(repeated=True)
 
     testInstance = Test()
+    testInstance2 = Test()
+
     self.assertIs(testInstance.test, None)
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance.test3, [])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     testInstance.test = "sure thing."
+
     self.assertEqual(testInstance.test, "sure thing.")
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance.test3, [])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     with self.assertRaises(TypeError):
         testInstance.test = ["spam", "spam", "spam", "spam"]
 
+    self.assertEqual(testInstance.test, "sure thing.")
     self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
-
     self.assertEqual(testInstance.test3, [])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
-    testInstance.test3 = "its the little things"
-    self.assertEqual(testInstance.test3, ["its the little things"])
+    with self.assertRaises(TypeError):
+        testInstance.test3 = "its the little things"
+
+    self.assertEqual(testInstance.test, "sure thing.")
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance.test3, [])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     testInstance.test3 = ["one great thing", "deserves another"]
+
+    self.assertEqual(testInstance.test, "sure thing.")
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
     self.assertEqual(testInstance.test3, ["one great thing", "deserves another"])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     testInstance.test3.append("litte thing")
+    self.assertEqual(testInstance.test, "sure thing.")
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
     self.assertEqual(testInstance.test3, ["one great thing", "deserves another", "litte thing"])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     testInstance.test3[1] = "looks like"
+
+    self.assertEqual(testInstance.test, "sure thing.")
+    self.assertEqual(testInstance.test2, "haggis, neeps and tatties")
     self.assertEqual(testInstance.test3, ["one great thing", "looks like", "litte thing"])
+    self.assertIs(testInstance2.test, None)
+    self.assertEqual(testInstance2.test2, "haggis, neeps and tatties")
+    self.assertEqual(testInstance2.test3, [])
 
     with self.assertRaises(TypeError):
         testInstance.test = 1
@@ -101,8 +199,6 @@ class PropertysTestCase(unittest.TestCase):
     with self.assertRaises(TypeError):
         testInstance.test3 = [1]
 
-    # http://stackoverflow.com/questions/20648366/strange-interaction-between-setitem-and-get
-    testInstance.test3 = ["one great thing", "deserves another", "and another"]
     with self.assertRaises(TypeError):
         (testInstance.test3[0]) = 1
 
@@ -191,16 +287,57 @@ class DataStoreTestCase(unittest.TestCase):
 
   def testDataStoreAsMixin(self):
     class Test(data_dict.DataStore):
-      def fields(self):
-        testBool = data_dict.BooleanProperty()
-        testString = data_dict.StringProperty()
-        testStringRepeated = data_dict.StringProperty(repeated=True)
+      testBool = data_dict.BooleanProperty()
+      testString = data_dict.StringProperty()
+      testStringRepeated = data_dict.StringProperty(repeated=True)
 
     instance = Test()
+    instance2 = Test()
+
+    self.assertIn("testBool", dir(instance))
+    self.assertIn("testString", dir(instance))
+    self.assertIn("testStringRepeated", dir(instance))
+    self.assertIn("testBool", dir(instance2))
+    self.assertIn("testString", dir(instance2))
+    self.assertIn("testStringRepeated", dir(instance2))
+
+    self.assertEqual(instance.testBool, None)
+    self.assertIs(instance.testString, None)
+    self.assertEqual(instance.testStringRepeated, [])
+    self.assertEqual(instance2.testBool, None)
+    self.assertIs(instance2.testString, None)
+    self.assertEqual(instance2.testStringRepeated, [])
+
+    with self.assertRaises(TypeError):
+        instance.testBool = "anyhow"
+
+    with self.assertRaises(TypeError):
+        instance.testString = True
+
+    with self.assertRaises(TypeError):
+        instance.testStringRepeated = "anyhow"
+
+    self.assertEqual(instance.testBool, None)
+    self.assertIs(instance.testString, None)
+    self.assertEqual(instance.testStringRepeated, [])
+    self.assertEqual(instance2.testBool, None)
+    self.assertIs(instance2.testString, None)
+    self.assertEqual(instance2.testStringRepeated, [])
+
     instance.testBool = True
     instance.testString = "song"
     instance.testStringRepeated = ["moma", "dont", "like"]
+
+    self.assertEqual(instance.testBool, True)
+    self.assertIs(instance.testString, "song")
+    self.assertEqual(instance.testStringRepeated, ["moma", "dont", "like"])
+    self.assertEqual(instance2.testBool, None)
+    self.assertIs(instance2.testString, None)
+    self.assertEqual(instance2.testStringRepeated, [])
+
     instance.testStringRepeated.append("us all singing at the same time.")
+
+    self.assertEqual(instance.testStringRepeated, ["moma", "dont", "like", "us all singing at the same time."])
 
     self.assertEqual(data_dict.gKeyCounter, 0)
     self.assertEqual(len(data_dict.gContainer), 0)
@@ -209,6 +346,11 @@ class DataStoreTestCase(unittest.TestCase):
 
     self.assertEqual(data_dict.gKeyCounter, 1)
     self.assertEqual(len(data_dict.gContainer), 1)
+
+    instance2.put()
+
+    self.assertEqual(data_dict.gKeyCounter, 2)
+    self.assertEqual(len(data_dict.gContainer), 2)
 
     retreived = Test(key=instance.key).get()
     self.assertEqual(retreived.testBool, True)
@@ -219,6 +361,17 @@ class DataStoreTestCase(unittest.TestCase):
     self.assertEqual(retreived2.testBool, True)
     self.assertEqual(retreived2.testString, "song")
     self.assertEqual(len(retreived2.testStringRepeated), 4)
+
+  def testDataStoreAsMixinMultiInherit(self):
+    class TestOuter(data_dict.DataStore):
+        testBoolOut = data_dict.BooleanProperty()
+
+    class TestInner(TestOuter):
+        testBoolIn = data_dict.BooleanProperty()
+
+    instance = TestInner()
+    self.assertIn("testBoolOut", dir(instance))
+    self.assertIn("testBoolOut", dir(instance))
 
 
 class DataListTestCase(unittest.TestCase):

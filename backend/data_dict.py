@@ -17,42 +17,114 @@ class ContentType(object):
   CLIMB = 4
 
 
-class BooleanProperty(object):
-    def __init__(self, default=None):
-        if default is None or type(default) is BooleanType:
-            self.value = default
+class AllProperties(object):
+    """
+    It is important not to modify self.index.
+    This value is a unique identifier for the Property Instance so it can be tracked accross multiple instances of it's parent class.
+    The unique self.index is registerd in self.instanceIndexed of the parent class.
+    """
+    index = 0
+
+    @classmethod
+    def increaseIndex(cls):
+        """ Keep a counter of how many Properties (of all kinds) have been initialised."""
+        cls.index += 1
+
+    def checkInput(self, data):
+        return (not self.repeated and \
+                    (data is None or type(data) is self.dataType)) or \
+               (self.repeated and type(data) is ListType and \
+                    len([item for item in data if type(item) is self.dataType]) == len(data))
+
+    def __init__(self, dataType, default=None, repeated=False):
+        AllProperties.increaseIndex()
+
+        if repeated == True and default is None:
+            default = []
+
+        self.default = default
+        self.instanceIndexed = []
+        self.instanceIndex = self.index
+        self.repeated = repeated
+        self.dataType = dataType
+        if self.checkInput(default):
             return
         raise TypeError
 
     def __get__(self, instance, owner):
-        return self.value
+        if "instanceIndexed" not in dir(instance):
+            instance.instanceIndexed = []
+        if self.instanceIndex not in self.instanceIndexed:
+            instance.instanceIndexed.append(self.instanceIndex)
+
+        index = instance.instanceIndexed.index(self.instanceIndex)
+
+        if "values" not in dir(instance):
+            instance.values = []
+        if len(instance.values) <= index:
+            instance.values.extend([None] * (1 + index - len(instance.values)))
+            if self.repeated:
+                self.default = self.ListValue(self.dataType, self.default)
+            instance.values[index] = self.default
+
+        return instance.values[index]
 
     def __set__(self, instance, value):
-        if type(value) is not BooleanType and value is not None:
+        if not self.checkInput(value):
             raise TypeError
-        self.value = value
 
+        if "instanceIndexed" not in dir(instance):
+            instance.instanceIndexed = []
+        if self.instanceIndex not in self.instanceIndexed:
+            instance.instanceIndexed.append(self.instanceIndex)
+        index = instance.instanceIndexed.index(self.instanceIndex)
 
-class EnumProperty(object):
-    def __init__(self, classType, default=None):
-        self.classType = classType
-        if default is None or default in [getattr(self.classType, k) for k in dir(self.classType) if k[0] != '_']:
-            self.value = default
-            return
-        raise TypeError
+        if "values" not in dir(instance):
+            instance.values = []
+        if len(instance.values) <= index:
+            instance.values.extend([None] * (1 + index - len(instance.values)))
 
-    def __get__(self, instance, owner):
-        return self.value
+        if self.repeated:
+            value = self.ListValue(self.dataType, value)
+        instance.values[index] = value
 
-    def __set__(self, instance, value):
-        if value not in [getattr(self.classType, k) for k in dir(self.classType) if k[0] != '_'] and value is not None:
-            raise TypeError
-        self.value = value
+    class ListValue(list):
+        """Overload a list to perform some value checking on repeated values."""
 
+        def __init__(self, dataType, *kargs):
+            list.__init__(self, *kargs)
+            self.dataType = dataType
 
-class StringProperty(object):
+        def __setitem__(self, key, value):
+            if type(value) is self.dataType:
+                list.__setitem__(self, key, value)
+            elif type(value) is ListType and len([item for item in value if type(item) is self.dataType]) == len(value):
+                list.__setitem__(self, key, value)
+            else:
+                raise TypeError
+
+class BooleanProperty(AllProperties):
     def __init__(self, default=None, repeated=False):
-        self.obj = None
+        AllProperties.__init__(self, BooleanType, default=default, repeated=repeated)
+
+
+class EnumProperty(AllProperties):
+    def __init__(self, classType, default=None, repeated=False):
+        AllProperties.__init__(self, classType, default=default, repeated=repeated)
+
+    def checkInput(self, data):
+        return (not self.repeated and \
+                    (data is None or data in [getattr(self.dataType, k) for k in dir(self.dataType) if k[0] != '_'])) or \
+               (self.repeated and type(data) is ListType and \
+                    len([item for item in data if type(item) is self.dataType]) == len(data))
+
+
+class StringProperty(AllProperties):
+    def __init__(self, default=None, repeated=False):
+        AllProperties.__init__(self, StringType, default=default, repeated=repeated)
+
+class StringProperty2(object):
+    def __init__(self, default=None, repeated=False):
         if repeated:
             self.obj = StringPropertyRepeated(default=default)
         else:
@@ -143,13 +215,7 @@ class StringPropertySingle(object):
 
 class DataStore(object):
     def __init__(self, **kwargs):
-        # Recursive function to call all .fields() methods in inhereted classes.
-        def applyFields(clss):
-            if clss.__base__ is not DataStore and clss.__base__ is not object:
-                clss.__base__().fields()
-                applyFields(clss.__base__)
-        applyFields(self.__class__)
-
+        logging.debug("__init__")
         self.key = None     # May get overwritten by kwargs.
         for k in kwargs:
             setattr(self, k, kwargs[k])
@@ -168,7 +234,6 @@ class DataStore(object):
             self.key = DataStore.make_key(gKeyCounter)
         if value is None:
             value = self
-        #logging.debug("put %s" % value.active)
         gContainer[self.key] = value
         return self.key
 
@@ -190,29 +255,41 @@ class DataStore(object):
     def make_key(intiger):
         return 'dct_%s' % intiger
 
+    @classmethod
+    def query(cls, **kwargs):
+        logging.debug("DataStore.query(%s, %s)" % (cls, kwargs))
+        self = cls.__new__(cls)
+        return self
+
+    def filter(self, **kwargs):
+        logging.debug("DataStore.filter(%s)" % kwargs)
+        return self
+    def fetch(self, **kwargs):
+        logging.debug("DataStore.fetch(%s)" % kwargs)
+        return self
+    def count(self, **kwargs):
+        logging.debug("DataStore.count(%s)" % kwargs)
+        return 0
+
 
 class Container(DataStore):
-    def fields(self):
-        self.active = BooleanProperty()
-        self.contType = EnumProperty(ContentType)
-        self.menuParent = StringProperty()
-        self.menuChildren = StringProperty(repeated=True)
-        self.attributes = StringProperty(repeated=True)
+    active = BooleanProperty()
+    contType = EnumProperty(ContentType)
+    menuParent = StringProperty()
+    menuChildren = StringProperty(repeated=True)
+    attributes = StringProperty(repeated=True)
 
 class Attrib(DataStore):
-    def fields(self):
-        self.authur = None
-        self.created = None
-        self.modified = None
-        self.active = BooleanProperty()
+    authur = None
+    created = None
+    modified = None
+    active = BooleanProperty()
 
 class AttribName(Attrib):
-    def fields(self):
-        self.text = StringProperty()
+    text = StringProperty()
 
 class AttribDescription(Attrib):
-    def fields(self):
-        self.text = StringProperty()
+    text = StringProperty()
 
 
 class Element:
@@ -330,3 +407,60 @@ class Element:
             self.key = tmpKey
             self.container = tmpContainer
 
+    def addAttrib(self, attribute):
+        user = users.get_current_user()
+        if user is not None:
+            attributeClass = type(attribute)
+            attributeInstance = AttribName()
+            logging.debug(attributeInstance)
+            logging.debug(dir(attributeInstance))
+
+            query = attributeInstance.query(ancestor=self.key)
+            logging.debug(query)
+
+            #query = query.filter(authur==user)
+            #existingAttribs = query.fetch(1)
+            #existingAttribs = attributeInstance.query(ancestor=self.key)#.filter(attributeInstance.authur==user).fetch(1)
+
+            if len(existingAttribs):
+                props = attribute.to_dict()
+                attribute = existingAttribs[0]
+                attribute.populate(**props)
+            else:
+                attribute.authur = user
+                attribute = copyAttrib(attribute, self.key)
+            attributeKey = attribute.put()
+
+            # Get up to date version of container from datastore incase the one hee is stale.
+            tmpContainer = self.key.get()
+            if attributeKey and attributeKey not in tmpContainer.attributes:
+                tmpContainer.attributes.append(attributeKey)
+                tmpContainer.put()
+                # Do this after .put() so self.container is not modified if transaction is rolledback.
+                self.container = tmpContainer
+
+            # Update record with new attribute.
+            if self.attribs is not None:
+                outAtribList = []
+                attribFound = False
+                for attrib in self.attribs:
+                    if type(attrib) is ListType:
+                        outInstanceList = []
+                        for attribInstance in attrib:
+                            outInstanceList.append(attribInstance)
+                            match = False
+                            if attribInstance is not None:
+                                if type(attribInstance) is type(attribute):
+                                    attribFound = True
+                                    match = True
+                        if match:
+                            outInstanceList.append(attribute)
+                        outAtribList.append(outInstanceList)
+                    else:
+                        if attrib == type(attribute).__name__:
+                            attribFound = True
+                        outAtribList.append(attrib)
+                if not attribFound:
+                    outAtribList.append(type(attribute).__name__)
+                self.attribs = outAtribList
+        return attribute
