@@ -18,17 +18,8 @@ class ContentType(object):
 
 
 class AllProperties(object):
-    """
-    It is important not to modify self.index.
-    This value is a unique identifier for the Property Instance so it can be tracked accross multiple instances of it's parent class.
-    The unique self.index is registerd in self.instanceIndexed of the parent class.
-    """
-    index = 0
-
-    @classmethod
-    def increaseIndex(cls):
-        """ Keep a counter of how many Properties (of all kinds) have been initialised."""
-        cls.index += 1
+    # The metaClass DescriptorOwner will look for this tag later and replace it with the correct descriptor name.
+    label = ""
 
     def checkInput(self, data):
         return (not self.repeated and \
@@ -37,14 +28,10 @@ class AllProperties(object):
                     len([item for item in data if type(item) is self.dataType]) == len(data))
 
     def __init__(self, dataType, default=None, repeated=False):
-        AllProperties.increaseIndex()
-
         if repeated == True and default is None:
             default = []
 
         self.default = default
-        self.instanceIndexed = []
-        self.instanceIndex = self.index
         self.repeated = repeated
         self.dataType = dataType
         if self.checkInput(default):
@@ -52,41 +39,33 @@ class AllProperties(object):
         raise TypeError
 
     def __get__(self, instance, owner):
-        if "instanceIndexed" not in dir(instance):
-            instance.instanceIndexed = []
-        if self.instanceIndex not in self.instanceIndexed:
-            instance.instanceIndexed.append(self.instanceIndex)
+        if instance is None:
+            # Only happens when parent class of this descriptor is un-initiated.
+            # eg,
+            #   q = AttribName().query(ancestor=self.key).filter(AttribName.authur==user)
+            # Where this class is the descriptor .authur .
 
-        index = instance.instanceIndexed.index(self.instanceIndex)
+            # We return an self.Uninitiated() object which traps comparisons. (==)
+            logging.debug(owner)
+            logging.debug(self.label)
+            return self.Uninitiated(owner.__name__, self.label)
 
-        if "values" not in dir(instance):
-            instance.values = []
-        if len(instance.values) <= index:
-            instance.values.extend([None] * (1 + index - len(instance.values)))
+        if self.label not in instance.values:
             if self.repeated:
                 self.default = self.ListValue(self.dataType, self.default)
-            instance.values[index] = self.default
+            instance.values[self.label] = self.default
 
-        return instance.values[index]
+        return instance.values[self.label]
 
     def __set__(self, instance, value):
         if not self.checkInput(value):
+            logging.debug(type(value))
+            logging.debug(value)
             raise TypeError
-
-        if "instanceIndexed" not in dir(instance):
-            instance.instanceIndexed = []
-        if self.instanceIndex not in self.instanceIndexed:
-            instance.instanceIndexed.append(self.instanceIndex)
-        index = instance.instanceIndexed.index(self.instanceIndex)
-
-        if "values" not in dir(instance):
-            instance.values = []
-        if len(instance.values) <= index:
-            instance.values.extend([None] * (1 + index - len(instance.values)))
 
         if self.repeated:
             value = self.ListValue(self.dataType, value)
-        instance.values[index] = value
+        instance.values[self.label] = value
 
     class ListValue(list):
         """Overload a list to perform some value checking on repeated values."""
@@ -102,6 +81,25 @@ class AllProperties(object):
                 list.__setitem__(self, key, value)
             else:
                 raise TypeError
+
+    class Uninitiated(object):
+        """This is returned if the uninitiated parent class is ever requested.
+           Used when comparing a descriptor to a value in a .query().
+           eg. 
+            q = AttribName().query(ancestor=self.key).filter(AttribName.authur==user)
+        """ 
+        def __init__(self, classType, descriptorLabel):
+            self.classType = classType
+            self.descriptorLabel = descriptorLabel
+
+        def __eq__(self, other):
+            logging.debug("__eq__")
+            return (self.classType, self.descriptorLabel, "==", other)
+
+        def __cmp__(self, other):
+            logging.debug("__cmp__")
+            return (self.classType, self.descriptorLabel, "cmp", other)
+
 
 class BooleanProperty(AllProperties):
     def __init__(self, default=None, repeated=False):
@@ -123,99 +121,34 @@ class StringProperty(AllProperties):
     def __init__(self, default=None, repeated=False):
         AllProperties.__init__(self, StringType, default=default, repeated=repeated)
 
-class StringProperty2(object):
+
+class UserProperty(AllProperties):
     def __init__(self, default=None, repeated=False):
-        if repeated:
-            self.obj = StringPropertyRepeated(default=default)
-        else:
-            self.obj = StringPropertySingle(default=default)
+        AllProperties.__init__(self, users.User, default=default, repeated=repeated)
 
-    def __get__(self, instance, owner):
-        if self.obj is not None:
-            if self.obj.__class__ is StringPropertySingle:
-                # Single value
-                return self.obj.__get__(instance, owner)
-            # List of values
-            # http://stackoverflow.com/questions/20648366/strange-interaction-between-setitem-and-get
-            return self.obj
-        return
 
-    def __set__(self, instance, value):
-        self.obj.__set__(instance, value)
+class DescriptorOwner(type):
+    """ Needed so we descriptor objects can access their own names.
+    http://nbviewer.ipython.org/urls/gist.github.com/ChrisBeaumont/5758381/raw/descriptor_writeup.ipynb
+    http://stackoverflow.com/questions/100003/what-is-a-metaclass-in-python """
+    def __new__(cls, name, bases, attrs):
+        # find all descriptors, auto-set their labels
+        for n, v in attrs.items():
+            logging.debug((n,v))
+            logging.debug(type(v))
 
-    def __getitem__(self, key):
-        return self.obj.__getitem__(key)
-
-    def __setitem__(self, key, value):
-        self.obj.__setitem__(key, value)
-
-class StringPropertyRepeated(list):
-    def __init__(self, default=None):
-        if type(default) is StringType:
-            list.__init__(self, [default])
-            return
-        elif type(default) is ListType and ListType and len([val for val in default if type(val) is not StringType]) == 0:
-            list.__init__(self, default)
-            return
-        elif default is None:
-            list.__init__(self, [])
-            return
-        raise TypeError
-
-    def __set__(self, instance, value):
-        if value is None:
-            list.__init__(self, [])
-            return
-        if type(value) is ListType and len([val for val in value if type(val) is not StringType]) == 0:
-            list.__init__(self, value)
-            return
-        if type(value) is StringType:
-            list.__init__(self, [value])
-            return
-        raise TypeError
-
-    def __getitem__(self, key):
-        return list.__getitem__(self, key)
-
-    def __setitem__(self, key, value):
-        if type(value) is StringType:
-            list.__setitem__(self, key, value)
-            return
-        raise TypeError
-
-class StringPropertySingle(object):
-    def __init__(self, default=None):
-        self.value = None
-        if default is None or type(default) is StringType:
-            self.value = default
-            return
-        raise TypeError
-
-    def __get__(self, instance, owner):
-        return self.value
-
-    def __set__(self, instance, value):
-        if value is None:
-            self.value = value
-            return
-        if type(value) is StringType:
-            self.value = value
-            return
-        raise TypeError
-
-    def __getitem__(self, key):
-        return self.value[key]
-
-    def __setitem__(self, key, value):
-        if type(value) is StringType:
-            self.value[key] = value
-            return
-        raise TypeError
+            #if isinstance(v, UserProperty):
+            if hasattr(v, 'label'):  #type(v) == types.functionType:
+                logging.debug("*")
+                v.label = n
+        return super(DescriptorOwner, cls).__new__(cls, name, bases, attrs)
 
 
 class DataStore(object):
+    __metaclass__ = DescriptorOwner
+
     def __init__(self, **kwargs):
-        logging.debug("__init__")
+        self.values = {}    # (Key:Value)s assigned to descriptor instances where Key is the descriptor object name.
         self.key = None     # May get overwritten by kwargs.
         for k in kwargs:
             setattr(self, k, kwargs[k])
@@ -251,19 +184,31 @@ class DataStore(object):
             raise KeyError
         return gContainer[key]
 
+#    def __eq__(self, other):
+#        logging.debug("__eq__")
+#        return ("==", other)
+
+#    def __cmp__(self, other):
+#        logging.debug("__cmp__")
+#        
+
     @staticmethod
     def make_key(intiger):
         return 'dct_%s' % intiger
 
     @classmethod
-    def query(cls, **kwargs):
-        logging.debug("DataStore.query(%s, %s)" % (cls, kwargs))
+    def query(cls, ancestor=None, **kwargs):
+        logging.debug("DataStore.query(%s, ancestor=%s, %s)" % (cls, ancestor, kwargs))
         self = cls.__new__(cls)
+        self.ancestor = ancestor
+        self.filters = kwargs
         return self
 
-    def filter(self, **kwargs):
-        logging.debug("DataStore.filter(%s)" % kwargs)
+    def filter(self, *args, **kwargs):
+        logging.debug("DataStore.filter(%s, %s)" % (args, kwargs))
+        self.filters.update(kwargs)
         return self
+
     def fetch(self, **kwargs):
         logging.debug("DataStore.fetch(%s)" % kwargs)
         return self
@@ -280,7 +225,7 @@ class Container(DataStore):
     attributes = StringProperty(repeated=True)
 
 class Attrib(DataStore):
-    authur = None
+    authur = UserProperty()
     created = None
     modified = None
     active = BooleanProperty()
@@ -411,12 +356,14 @@ class Element:
         user = users.get_current_user()
         if user is not None:
             attributeClass = type(attribute)
-            attributeInstance = AttribName()
+            attributeInstance = attributeClass()
+            attributeInstance.authur=user
             logging.debug(attributeInstance)
             logging.debug(dir(attributeInstance))
 
-            query = attributeInstance.query(ancestor=self.key)
-            logging.debug(query)
+            query = attributeInstance.query(ancestor=self.key).filter(attributeClass.authur==user)
+            logging.debug(attributeClass.authur)
+            logging.debug(attributeClass.authur==user)
 
             #query = query.filter(authur==user)
             #existingAttribs = query.fetch(1)

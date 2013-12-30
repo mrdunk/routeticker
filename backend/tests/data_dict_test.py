@@ -19,9 +19,15 @@ class PropertysTestCase(unittest.TestCase):
 
   def testBooleanProperty(self):
     class Test(object):
+      __metaclass__ = data_dict.DescriptorOwner
+
       test = data_dict.BooleanProperty()
       test2 = data_dict.BooleanProperty(default=True)
       test3 = data_dict.BooleanProperty(repeated=True)
+
+      def __init__(self):
+        self.values = {}
+
 
     testInstance = Test()
     testInstance2 = Test()
@@ -80,8 +86,13 @@ class PropertysTestCase(unittest.TestCase):
 
   def testEnumProperty(self):
     class Test(object):
+      __metaclass__ = data_dict.DescriptorOwner
+    
       test = data_dict.EnumProperty(data_dict.ContentType)
       test2 = data_dict.EnumProperty(data_dict.ContentType, default=data_dict.ContentType().ROOT)
+
+      def __init__(self):
+        self.values = {}
 
     testInstance = Test()
     testInstance2 = Test()
@@ -121,9 +132,14 @@ class PropertysTestCase(unittest.TestCase):
 
   def testStringProperty(self):
     class Test(object):
+      __metaclass__ = data_dict.DescriptorOwner
+
       test = data_dict.StringProperty()
       test2 = data_dict.StringProperty(default="haggis, neeps and tatties")
       test3 = data_dict.StringProperty(repeated=True)
+
+      def __init__(self):
+        self.values = {}
 
     testInstance = Test()
     testInstance2 = Test()
@@ -288,25 +304,57 @@ class DataStoreTestCase(unittest.TestCase):
   def testDataStoreAsMixin(self):
     class Test(data_dict.DataStore):
       testBool = data_dict.BooleanProperty()
+      testBool2 = data_dict.BooleanProperty()
       testString = data_dict.StringProperty()
+      testString2 = data_dict.StringProperty()
       testStringRepeated = data_dict.StringProperty(repeated=True)
+      testStringRepeated2 = data_dict.StringProperty(repeated=True)
 
     instance = Test()
     instance2 = Test()
 
     self.assertIn("testBool", dir(instance))
+    self.assertIn("testBool2", dir(instance))
     self.assertIn("testString", dir(instance))
+    self.assertIn("testString2", dir(instance))
     self.assertIn("testStringRepeated", dir(instance))
+    self.assertIn("testStringRepeated2", dir(instance))
     self.assertIn("testBool", dir(instance2))
+    self.assertIn("testBool2", dir(instance2))
     self.assertIn("testString", dir(instance2))
+    self.assertIn("testString2", dir(instance2))
     self.assertIn("testStringRepeated", dir(instance2))
+    self.assertIn("testStringRepeated2", dir(instance2))
 
     self.assertEqual(instance.testBool, None)
+    self.assertEqual(instance.testBool2, None)
     self.assertIs(instance.testString, None)
+    self.assertIs(instance.testString2, None)
     self.assertEqual(instance.testStringRepeated, [])
+    self.assertEqual(instance.testStringRepeated2, [])
     self.assertEqual(instance2.testBool, None)
+    self.assertEqual(instance2.testBool2, None)
     self.assertIs(instance2.testString, None)
+    self.assertIs(instance2.testString2, None)
     self.assertEqual(instance2.testStringRepeated, [])
+    self.assertEqual(instance2.testStringRepeated2, [])
+
+    instance.testBool = True
+    instance.testString = "Choons!"
+    instance.testStringRepeated = ["moma", "dont", "like"]
+
+    self.assertEqual(instance.testBool, True)
+    self.assertEqual(instance.testBool2, None)
+    self.assertIs(instance.testString, "Choons!")
+    self.assertIs(instance.testString2, None)
+    self.assertEqual(instance.testStringRepeated, ["moma", "dont", "like"])
+    self.assertEqual(instance.testStringRepeated2, [])
+    self.assertEqual(instance2.testBool, None)
+    self.assertEqual(instance2.testBool2, None)
+    self.assertIs(instance2.testString, None)
+    self.assertIs(instance2.testString2, None)
+    self.assertEqual(instance2.testStringRepeated, [])
+    self.assertEqual(instance2.testStringRepeated2, [])
 
     with self.assertRaises(TypeError):
         instance.testBool = "anyhow"
@@ -317,23 +365,19 @@ class DataStoreTestCase(unittest.TestCase):
     with self.assertRaises(TypeError):
         instance.testStringRepeated = "anyhow"
 
-    self.assertEqual(instance.testBool, None)
-    self.assertIs(instance.testString, None)
-    self.assertEqual(instance.testStringRepeated, [])
-    self.assertEqual(instance2.testBool, None)
-    self.assertIs(instance2.testString, None)
-    self.assertEqual(instance2.testStringRepeated, [])
-
-    instance.testBool = True
-    instance.testString = "song"
-    instance.testStringRepeated = ["moma", "dont", "like"]
 
     self.assertEqual(instance.testBool, True)
-    self.assertIs(instance.testString, "song")
+    self.assertEqual(instance.testBool2, None)
+    self.assertIs(instance.testString, "Choons!")
+    self.assertIs(instance.testString2, None)
     self.assertEqual(instance.testStringRepeated, ["moma", "dont", "like"])
+    self.assertEqual(instance.testStringRepeated2, [])
     self.assertEqual(instance2.testBool, None)
+    self.assertEqual(instance2.testBool2, None)
     self.assertIs(instance2.testString, None)
+    self.assertIs(instance2.testString2, None)
     self.assertEqual(instance2.testStringRepeated, [])
+    self.assertEqual(instance2.testStringRepeated2, [])
 
     instance.testStringRepeated.append("us all singing at the same time.")
 
@@ -354,12 +398,12 @@ class DataStoreTestCase(unittest.TestCase):
 
     retreived = Test(key=instance.key).get()
     self.assertEqual(retreived.testBool, True)
-    self.assertEqual(retreived.testString, "song")
+    self.assertEqual(retreived.testString, "Choons!")
     self.assertEqual(len(retreived.testStringRepeated), 4)
 
     retreived2 = data_dict.DataStore(key=instance.key).get()
     self.assertEqual(retreived2.testBool, True)
-    self.assertEqual(retreived2.testString, "song")
+    self.assertEqual(retreived2.testString, "Choons!")
     self.assertEqual(len(retreived2.testStringRepeated), 4)
 
   def testDataStoreAsMixinMultiInherit(self):
